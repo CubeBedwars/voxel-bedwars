@@ -1,0 +1,19 @@
+{
+  "name": "voxel-bedwars",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Next-Gen 3D Voxel Bedwars Studio — Standalone Voxel Engine, AI Bots, Serverless WebRTC Multiplayer & Map Maker",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.170.0",
+    "peerjs": "^1.5.4"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
