@@ -60,6 +60,21 @@ const electronAPI = {
       return () => ipcRenderer.removeListener('lan-message', listener);
     }
   },
+
+  // Aliases matching LanDiscovery.js invocation
+  broadcastLanBeacon: (beacon, port = 8766) => {
+    return ipcRenderer.invoke('lan-broadcast', { message: beacon, port });
+  },
+
+  onLanBeaconReceived: (callback) => {
+    if (typeof callback === 'function') {
+      const listener = (_event, data) => {
+        callback(data?.payload || data);
+      };
+      ipcRenderer.on('lan-message', listener);
+      return () => ipcRenderer.removeListener('lan-message', listener);
+    }
+  },
 };
 
 // Expose API securely to main world

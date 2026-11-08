@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Player } from './Player.js';
 import { BLOCK_TYPES, BLOCK_PROPS } from '../engine/VoxelWorld.js';
+import { HeldItemRenderer } from '../engine/HeldItemRenderer.js';
 
 export class LocalPlayer extends Player {
   constructor(id, name, team, camera, canvas) {
@@ -39,82 +40,99 @@ export class LocalPlayer extends Player {
   }
 
   createArmMesh() {
-    this.armGroup = new THREE.Group();
-    // Voxel sword / arm mesh
-    const armGeo = new THREE.BoxGeometry(0.18, 0.5, 0.18);
-    const armMat = new THREE.MeshLambertMaterial({ color: 0xef4444 });
-    const arm = new THREE.Mesh(armGeo, armMat);
-    arm.position.set(0.35, -0.3, -0.6);
-    arm.rotation.set(0.4, -0.2, 0.1);
-    this.armGroup.add(arm);
-    this.camera.add(this.armGroup);
+    this.heldItemRenderer = new HeldItemRenderer(this.camera, this.canvas);
+    // Keep this.armGroup pointing to heldItemRenderer.itemGroup for 100% backward compatibility
+    this.armGroup = this.heldItemRenderer.itemGroup;
   }
 
   initControls() {
     // Mouse Pointer Lock
-    this.canvas.addEventListener('click', () => {
-      if (!document.pointerLockElement) {
-        this.canvas.requestPointerLock();
-      }
-    });
+    if (this.canvas && typeof this.canvas.addEventListener === 'function') {
+      this.canvas.addEventListener('click', () => {
+        if (!document.pointerLockElement && typeof this.canvas.requestPointerLock === 'function') {
+          this.canvas.requestPointerLock();
+        }
+      });
+    }
 
-    document.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement === this.canvas) {
-        const sens = 0.0022;
-        this.yaw -= e.movementX * sens;
-        this.pitch -= e.movementY * sens;
-        this.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.pitch));
-      }
-    });
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('mousemove', (e) => {
+        if (document.pointerLockElement === this.canvas) {
+          const sens = 0.0022;
+          this.yaw -= (e.movementX || 0) * sens;
+          this.pitch -= (e.movementY || 0) * sens;
+          this.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.pitch));
+        }
+      });
+    }
 
     // Keyboard bindings
-    window.addEventListener('keydown', (e) => {
-      switch (e.code) {
-        case 'KeyW': this.keys.forward = true; break;
-        case 'KeyS': this.keys.backward = true; break;
-        case 'KeyA': this.keys.left = true; break;
-        case 'KeyD': this.keys.right = true; break;
-        case 'Space': this.keys.jump = true; break;
-        case 'ShiftLeft':
-        case 'ShiftRight': this.keys.sprint = true; break;
-        // Hotbar selection 1-9
-        case 'Digit1': this.selectedSlot = 0; break;
-        case 'Digit2': this.selectedSlot = 1; break;
-        case 'Digit3': this.selectedSlot = 2; break;
-        case 'Digit4': this.selectedSlot = 3; break;
-        case 'Digit5': this.selectedSlot = 4; break;
-        case 'Digit6': this.selectedSlot = 5; break;
-        case 'Digit7': this.selectedSlot = 6; break;
-        case 'Digit8': this.selectedSlot = 7; break;
-        case 'Digit9': this.selectedSlot = 8; break;
-      }
-    });
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('keydown', (e) => {
+        switch (e.code) {
+          case 'KeyW': this.keys.forward = true; break;
+          case 'KeyS': this.keys.backward = true; break;
+          case 'KeyA': this.keys.left = true; break;
+          case 'KeyD': this.keys.right = true; break;
+          case 'Space': this.keys.jump = true; break;
+          case 'ShiftLeft':
+          case 'ShiftRight': this.keys.sprint = true; break;
+          // Hotbar selection 1-9
+          case 'Digit1': this.selectedSlot = 0; break;
+          case 'Digit2': this.selectedSlot = 1; break;
+          case 'Digit3': this.selectedSlot = 2; break;
+          case 'Digit4': this.selectedSlot = 3; break;
+          case 'Digit5': this.selectedSlot = 4; break;
+          case 'Digit6': this.selectedSlot = 5; break;
+          case 'Digit7': this.selectedSlot = 6; break;
+          case 'Digit8': this.selectedSlot = 7; break;
+          case 'Digit9': this.selectedSlot = 8; break;
+        }
+      });
 
-    window.addEventListener('keyup', (e) => {
-      switch (e.code) {
-        case 'KeyW': this.keys.forward = false; break;
-        case 'KeyS': this.keys.backward = false; break;
-        case 'KeyA': this.keys.left = false; break;
-        case 'KeyD': this.keys.right = false; break;
-        case 'Space': this.keys.jump = false; break;
-        case 'ShiftLeft':
-        case 'ShiftRight': this.keys.sprint = false; break;
-      }
-    });
+      window.addEventListener('keyup', (e) => {
+        switch (e.code) {
+          case 'KeyW': this.keys.forward = false; break;
+          case 'KeyS': this.keys.backward = false; break;
+          case 'KeyA': this.keys.left = false; break;
+          case 'KeyD': this.keys.right = false; break;
+          case 'Space': this.keys.jump = false; break;
+          case 'ShiftLeft':
+          case 'ShiftRight': this.keys.sprint = false; break;
+        }
+      });
 
-    // Mouse wheel slot scrolling
-    window.addEventListener('wheel', (e) => {
-      if (e.deltaY > 0) {
-        this.selectedSlot = (this.selectedSlot + 1) % 9;
-      } else if (e.deltaY < 0) {
-        this.selectedSlot = (this.selectedSlot - 1 + 9) % 9;
-      }
-    }, { passive: true });
+      // Mouse wheel slot scrolling
+      window.addEventListener('wheel', (e) => {
+        if (e.deltaY > 0) {
+          this.selectedSlot = (this.selectedSlot + 1) % 9;
+        } else if (e.deltaY < 0) {
+          this.selectedSlot = (this.selectedSlot - 1 + 9) % 9;
+        }
+      }, { passive: true });
+    }
+  }
+
+  isItemEnchanted(item) {
+    if (!item) return false;
+    const isDiamond = item.id?.startsWith('diamond_') || item.name?.toLowerCase().includes('diamond');
+    const sharpnessTier = (this.teamManager?.teams?.[this.team]?.upgrades?.sharpness) ?? (this.teamUpgrades?.sharpness || 0);
+    const isWeapon = item.type === 'weapon' || item.id?.includes('sword') || typeof item.damage === 'number';
+    if (isWeapon && (sharpnessTier > 0 || isDiamond)) {
+      return true;
+    }
+    if ((item.type === 'tool' || item.id?.includes('pickaxe')) && isDiamond) {
+      return true;
+    }
+    return false;
   }
 
   triggerSwing() {
     this.isSwinging = true;
     this.swingProgress = 0;
+    if (this.heldItemRenderer) {
+      this.heldItemRenderer.triggerSwing();
+    }
   }
 
   update(dt, physics) {
@@ -168,14 +186,21 @@ export class LocalPlayer extends Player {
     const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
     this.camera.quaternion.setFromEuler(euler);
 
-    // 5. Weapon swing animation
-    if (this.isSwinging) {
+    // 5. 3D Held Item & Weapon swing animation
+    if (this.heldItemRenderer) {
+      const selectedItem = this.getSelectedItem();
+      const isEnchanted = this.isItemEnchanted(selectedItem);
+      this.heldItemRenderer.setHeldItem(selectedItem, isEnchanted, this.team);
+      this.heldItemRenderer.update(dt, this);
+      this.isSwinging = this.heldItemRenderer.isSwinging;
+      this.swingProgress = this.heldItemRenderer.swingProgress;
+    } else if (this.isSwinging) {
       this.swingProgress += dt * 8.0;
       if (this.swingProgress >= Math.PI) {
         this.isSwinging = false;
         this.swingProgress = 0;
-        this.armGroup.rotation.set(0, 0, 0);
-      } else {
+        if (this.armGroup) this.armGroup.rotation.set(0, 0, 0);
+      } else if (this.armGroup) {
         this.armGroup.rotation.x = Math.sin(this.swingProgress) * 0.8;
         this.armGroup.rotation.y = -Math.sin(this.swingProgress) * 0.4;
       }

@@ -16,13 +16,19 @@
     <!-- WebGL 3D Canvas -->
     <canvas id="game-canvas"></canvas>
 
-    <!-- Crosshair -->
+    <!-- Crosshair & 4-Tick Hitmarker -->
     <div id="crosshair" class="hidden">
       <div class="ch-center"></div>
       <div class="ch-line ch-top"></div>
       <div class="ch-line ch-bottom"></div>
       <div class="ch-line ch-left"></div>
       <div class="ch-line ch-right"></div>
+      <div id="hitmarker" class="hitmarker hidden">
+        <div class="hm-tick hm-tl"></div>
+        <div class="hm-tick hm-tr"></div>
+        <div class="hm-tick hm-bl"></div>
+        <div class="hm-tick hm-br"></div>
+      </div>
     </div>
 
     <!-- Screen Effects -->
@@ -41,14 +47,24 @@
       <div id="hud-team-tracker" class="glass-card tracker-card"></div>
 
       <!-- Scoreboard -->
-      <div id="hud-scoreboard" class="glass-card scoreboard-card">
+      <div id="hud-scoreboard" class="glass-card scoreboard-card mc-scoreboard">
         <div class="sb-header">
-          <span class="sb-title">VOXEL BEDWARS</span>
+          <span class="sb-title">BED WARS</span>
           <span id="sb-mode-badge" class="badge-mode">SOLO</span>
+        </div>
+        <div class="sb-sub-header">
+          <span id="sb-date" class="sb-date">11/08/26</span>
+          <span id="sb-server" class="sb-server">cubebedwars.com</span>
         </div>
         <div id="hud-net-badge" class="badge-net-status net-offline" style="display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-top:4px;background:rgba(148,163,184,0.1);color:#94a3b8;">
           <span class="net-status-dot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>
           <span id="hud-net-text">Solo (Offline)</span>
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-meta-info">
+          <div class="sb-row"><span>Map:</span> <span id="sb-map-name" class="val-gold">Speedway</span></div>
+          <div class="sb-row"><span>Mutation:</span> <span id="sb-mutation-name" class="val-cyan">None</span></div>
+          <div class="sb-row sb-event-row"><span>Event:</span> <span id="sb-event-timer" class="val-gold">Diamond II in 04:00</span></div>
         </div>
         <div class="sb-divider"></div>
         <div class="sb-section-title">TEAM BEDS</div>
@@ -64,9 +80,10 @@
         </div>
         <div class="sb-divider"></div>
         <div class="sb-footer" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>[E] Shop | [U] Upgrades</span>
+          <span>[E] Shop | [U] Upg | [B] Quick</span>
           <button id="btn-toggle-touch" class="btn-touch-toggle" title="Toggle On-Screen Touch Controls">📱 Touch</button>
         </div>
+        <div class="sb-server-footer">cubebedwars.com</div>
       </div>
 
       <!-- Bottom Center Status & Hotbar -->
@@ -79,17 +96,43 @@
           <div class="res-item res-emerald"><span class="res-icon">🟢</span> <span id="res-eme-val">0</span></div>
         </div>
 
-        <!-- Health & Armor -->
-        <div class="vitals-row">
-          <div id="health-hearts" class="hearts-container"></div>
-          <div class="armor-badge">
+        <!-- Vitals Layout directly above hotbar -->
+        <div class="hud-vitals-container">
+          <!-- Top row: 10 armor chestplates on left; 10 hunger drumsticks on right -->
+          <div class="hud-vitals-row hud-vitals-top">
+            <div id="armor-bar" class="vitals-bar armor-bar"></div>
+            <div id="hunger-bar" class="vitals-bar hunger-bar"></div>
+          </div>
+
+          <!-- Bottom row: 10 health hearts on left (+ golden absorption hearts) -->
+          <div class="hud-vitals-row hud-vitals-bottom">
+            <div id="health-hearts" class="vitals-bar hearts-container"></div>
+            <div id="air-bubbles" class="vitals-bar air-bar"></div>
+          </div>
+
+          <!-- Backward compatibility armor badge -->
+          <div class="armor-badge" style="display:none;">
             <span class="armor-icon">🛡️</span>
             <span id="armor-name">NONE</span>
           </div>
         </div>
 
-        <!-- 9-Slot Hotbar -->
-        <div id="hotbar" class="hotbar-container glass-card"></div>
+        <!-- Centered Green XP Bar with Level Numeral -->
+        <div id="hud-xp-container" class="hud-xp-container">
+          <div id="hud-xp-level" class="hud-xp-level">1</div>
+          <div class="hud-xp-track">
+            <div id="hud-xp-fill" class="hud-xp-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 9-Slot Centered Hotbar with [B] Quick Shop -->
+        <div class="hud-hotbar-wrapper">
+          <div id="hotbar" class="hotbar-container mc-hotbar"></div>
+          <button id="btn-quick-shop" class="btn-quick-shop" title="Quick Shop [B]">
+            <span class="key-shortcut">[B]</span>
+            <span class="label">SHOP</span>
+          </button>
+        </div>
       </div>
     </div>
 

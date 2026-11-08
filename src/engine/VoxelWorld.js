@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { TextureGenerator } from './TextureGenerator.js';
+import { Chunk, getChunkKey, worldToChunkCoord, worldToLocalCoord } from './Chunk.js';
+import { TextureAtlas } from './TextureAtlas.js';
+import { ChunkMesher } from './ChunkMesher.js';
 
 export const BLOCK_TYPES = {
   AIR: 0,
@@ -77,7 +80,7 @@ export const BLOCK_PROPS = {
 export class VoxelWorld {
   constructor(scene) {
     this.scene = scene;
-    this.blocks = new Map(); // "x,y,z" -> blockId
+    this.blocks = new Map(); // "x,y,z" -> blockId (kept 100% in sync for backward compatibility)
     this.blockData = new Map(); // "x,y,z" -> { team, metadata }
     this.texGen = new TextureGenerator();
 
@@ -85,11 +88,19 @@ export class VoxelWorld {
     this.initMaterials();
 
     this.voxelGroup = new THREE.Group();
-    this.scene.add(this.voxelGroup);
+    if (this.scene && typeof this.scene.add === 'function') {
+      this.scene.add(this.voxelGroup);
+    }
 
     this.instancedMeshes = new Map();
     this.dummy = new THREE.Object3D();
     this.isDirty = false;
+
+    // Modular 16x16x16 Chunk Architecture
+    this.chunks = new Map(); // "cx,cy,cz" -> Chunk
+    this.dirtyChunks = new Set();
+    this.atlas = new TextureAtlas(this.texGen);
+    this.chunkMesher = new ChunkMesher(this, this.atlas);
   }
 
   initMaterials() {
@@ -101,7 +112,6 @@ export class VoxelWorld {
         const top = this.texGen.getTexture('grass', 'top');
         const side = this.texGen.getTexture('grass', 'side');
         const bottom = this.texGen.getTexture('grass', 'bottom');
-        // px, nx, py, ny, pz, nz
         const mats = [
           new THREE.MeshLambertMaterial({ map: side }),
           new THREE.MeshLambertMaterial({ map: side }),
@@ -151,8 +161,58 @@ export class VoxelWorld {
     return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
   }
 
+  getChunk(cx, cy, cz, createIfMissing = false) {
+    const key = getChunkKey(cx, cy, cz);
+    let chunk = this.chunks.get(key);
+    if (!chunk && createIfMissing) {
+      chunk = new Chunk(cx, cy, cz, this);
+      this.chunks.set(key, chunk);
+      this.dirtyChunks.add(chunk);
+    }
+    return chunk || null;
+  }
+
+  markChunkDirty(chunk) {
+    if (chunk) {
+      this.dirtyChunks.add(chunk);
+      this.isDirty = true;
+    }
+  }
+
+  markNeighborChunkDirty(cx, cy, cz) {
+    const key = getChunkKey(cx, cy, cz);
+    const neighbor = this.chunks.get(key);
+    if (neighbor) {
+      neighbor.dirty = true;
+      this.dirtyChunks.add(neighbor);
+    }
+  }
+
+  isBlockTypeSolid(type) {
+    if (type === 0 || type === BLOCK_TYPES.AIR) return false;
+    const prop = BLOCK_PROPS[type];
+    return prop ? prop.solid : false;
+  }
+
   getBlock(x, y, z) {
-    const key = this.getKey(x, y, z);
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+
+    const cx = worldToChunkCoord(ix);
+    const cy = worldToChunkCoord(iy);
+    const cz = worldToChunkCoord(iz);
+
+    const chunk = this.chunks.get(getChunkKey(cx, cy, cz));
+    if (chunk) {
+      const lx = worldToLocalCoord(ix);
+      const ly = worldToLocalCoord(iy);
+      const lz = worldToLocalCoord(iz);
+      return chunk.get(lx, ly, lz);
+    }
+
+    // Fallback lookup on legacy Map if populated directly
+    const key = `${ix},${iy},${iz}`;
     return this.blocks.get(key) || BLOCK_TYPES.AIR;
   }
 
@@ -163,12 +223,16 @@ export class VoxelWorld {
 
   isSolid(x, y, z) {
     const type = this.getBlock(x, y, z);
-    const prop = BLOCK_PROPS[type];
-    return prop ? prop.solid : false;
+    return this.isBlockTypeSolid(type);
   }
 
   setBlock(x, y, z, type, data = null) {
-    const key = this.getKey(x, y, z);
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const key = `${ix},${iy},${iz}`;
+
+    // 1. Maintain backward-compatible Map
     if (type === BLOCK_TYPES.AIR) {
       this.blocks.delete(key);
       this.blockData.delete(key);
@@ -176,13 +240,37 @@ export class VoxelWorld {
       this.blocks.set(key, type);
       if (data) this.blockData.set(key, data);
     }
+
+    // 2. Route to 16x16x16 Chunk
+    const cx = worldToChunkCoord(ix);
+    const cy = worldToChunkCoord(iy);
+    const cz = worldToChunkCoord(iz);
+
+    const chunk = this.getChunk(cx, cy, cz, type !== BLOCK_TYPES.AIR);
+    if (chunk) {
+      const lx = worldToLocalCoord(ix);
+      const ly = worldToLocalCoord(iy);
+      const lz = worldToLocalCoord(iz);
+      chunk.set(lx, ly, lz, type);
+    }
+
     this.isDirty = true;
   }
 
   clear() {
     this.blocks.clear();
     this.blockData.clear();
-    this.rebuildMeshes();
+    for (const chunk of this.chunks.values()) {
+      chunk.dispose();
+    }
+    this.chunks.clear();
+    this.dirtyChunks.clear();
+    if (this.voxelGroup) {
+      while (this.voxelGroup.children && this.voxelGroup.children.length > 0) {
+        this.voxelGroup.remove(this.voxelGroup.children[0]);
+      }
+    }
+    this.isDirty = false;
   }
 
   isExposed(x, y, z) {
@@ -198,53 +286,23 @@ export class VoxelWorld {
   }
 
   rebuildMeshes() {
-    // Remove old meshes from scene
-    for (const mesh of this.instancedMeshes.values()) {
-      this.voxelGroup.remove(mesh);
-      // Clean up the instance geometry safely without breaking other objects
-      mesh.geometry.dispose();
-    }
-    this.instancedMeshes.clear();
+    // Mesh all dirty chunks (or all chunks if dirtyChunks is empty but world is marked dirty)
+    const chunksToMesh = this.dirtyChunks.size > 0
+      ? Array.from(this.dirtyChunks)
+      : Array.from(this.chunks.values());
 
-    // Group blocks by type
-    const blocksByType = new Map();
-    for (const [key, type] of this.blocks.entries()) {
-      if (type === BLOCK_TYPES.AIR) continue;
-      if (!blocksByType.has(type)) {
-        blocksByType.set(type, []);
+    for (const chunk of chunksToMesh) {
+      this.chunkMesher.meshChunk(chunk);
+
+      if (chunk.mesh && chunk.mesh.parent !== this.voxelGroup) {
+        this.voxelGroup.add(chunk.mesh);
       }
-      const [x, y, z] = key.split(',').map(Number);
-      if (this.isExposed(x, y, z)) {
-        blocksByType.get(type).push({ x, y, z });
+      if (chunk.transparentMesh && chunk.transparentMesh.parent !== this.voxelGroup) {
+        this.voxelGroup.add(chunk.transparentMesh);
       }
     }
 
-    // Build new InstancedMesh for each block type with its own dedicated BoxGeometry
-    for (const [type, positions] of blocksByType.entries()) {
-      const material = this.materials.get(type) || this.materials.get(BLOCK_TYPES.STONE);
-      const count = positions.length;
-      if (count === 0) continue;
-
-      // Independent geometry per instanced mesh to prevent disposal cross-contamination
-      const geo = new THREE.BoxGeometry(1, 1, 1);
-      const mesh = new THREE.InstancedMesh(geo, material, count);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-
-      for (let i = 0; i < count; i++) {
-        const { x, y, z } = positions[i];
-        this.dummy.position.set(x + 0.5, y + 0.5, z + 0.5);
-        this.dummy.rotation.set(0, 0, 0);
-        this.dummy.scale.set(1, 1, 1);
-        this.dummy.updateMatrix();
-        mesh.setMatrixAt(i, this.dummy.matrix);
-      }
-
-      mesh.instanceMatrix.needsUpdate = true;
-      this.instancedMeshes.set(type, mesh);
-      this.voxelGroup.add(mesh);
-    }
-
+    this.dirtyChunks.clear();
     this.isDirty = false;
   }
 

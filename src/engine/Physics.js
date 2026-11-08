@@ -4,6 +4,7 @@ export class Physics {
   constructor(world) {
     this.world = world;
     this.gravity = -24.0;
+    this.maxStepHeight = 0.5; // Auto step-climb up to 0.5 blocks (slabs and half-height steps)
   }
 
   // Resolves AABB collision for an entity moving with velocity over delta time
@@ -22,19 +23,69 @@ export class Physics {
     const height = entity.height || 1.8;
     const halfW = width / 2;
 
-    // Movement breakdown by axis for clean wall-sliding
-    // 1. Move along X
-    entity.position.x += entity.velocity.x * dt;
-    if (this.checkCollision(entity.position, halfW, height)) {
-      entity.position.x -= entity.velocity.x * dt;
-      entity.velocity.x = 0;
+    // Movement breakdown by axis for clean wall-sliding & step-climbing
+    // 1. Move along X with 0.5-Block Step-Climbing
+    const dx = entity.velocity.x * dt;
+    if (dx !== 0) {
+      entity.position.x += dx;
+      if (this.checkCollision(entity.position, halfW, height)) {
+        let stepped = false;
+        if (entity.onGround) {
+          const originalY = entity.position.y;
+          entity.position.y = originalY + this.maxStepHeight;
+          if (!this.checkCollision(entity.position, halfW, height)) {
+            let targetY = originalY + this.maxStepHeight;
+            for (let testStep = 0.05; testStep <= this.maxStepHeight + 0.01; testStep += 0.05) {
+              entity.position.y = originalY + testStep;
+              if (!this.checkCollision(entity.position, halfW, height)) {
+                targetY = entity.position.y;
+                stepped = true;
+                break;
+              }
+            }
+            entity.position.y = targetY;
+          } else {
+            entity.position.y = originalY;
+          }
+        }
+
+        if (!stepped) {
+          entity.position.x -= dx;
+          entity.velocity.x = 0;
+        }
+      }
     }
 
-    // 2. Move along Z
-    entity.position.z += entity.velocity.z * dt;
-    if (this.checkCollision(entity.position, halfW, height)) {
-      entity.position.z -= entity.velocity.z * dt;
-      entity.velocity.z = 0;
+    // 2. Move along Z with 0.5-Block Step-Climbing
+    const dz = entity.velocity.z * dt;
+    if (dz !== 0) {
+      entity.position.z += dz;
+      if (this.checkCollision(entity.position, halfW, height)) {
+        let stepped = false;
+        if (entity.onGround) {
+          const originalY = entity.position.y;
+          entity.position.y = originalY + this.maxStepHeight;
+          if (!this.checkCollision(entity.position, halfW, height)) {
+            let targetY = originalY + this.maxStepHeight;
+            for (let testStep = 0.05; testStep <= this.maxStepHeight + 0.01; testStep += 0.05) {
+              entity.position.y = originalY + testStep;
+              if (!this.checkCollision(entity.position, halfW, height)) {
+                targetY = entity.position.y;
+                stepped = true;
+                break;
+              }
+            }
+            entity.position.y = targetY;
+          } else {
+            entity.position.y = originalY;
+          }
+        }
+
+        if (!stepped) {
+          entity.position.z -= dz;
+          entity.velocity.z = 0;
+        }
+      }
     }
 
     // 3. Move along Y
@@ -96,6 +147,17 @@ export class Physics {
     entity.velocity.x += dir.x * strength;
     entity.velocity.z += dir.z * strength;
     entity.velocity.y = verticalBoost;
+    entity.onGround = false;
+  }
+
+  // Launchpad impulse applicator ("Launch Rush" & Map Jump-Pads)
+  applyLaunchpadImpulse(entity, forwardDir = null, horizontalPower = 16.0, verticalPower = 18.0) {
+    if (forwardDir && (forwardDir.x !== 0 || forwardDir.z !== 0)) {
+      const hDir = new THREE.Vector3(forwardDir.x, 0, forwardDir.z).normalize();
+      entity.velocity.x = hDir.x * horizontalPower;
+      entity.velocity.z = hDir.z * horizontalPower;
+    }
+    entity.velocity.y = verticalPower;
     entity.onGround = false;
   }
 }

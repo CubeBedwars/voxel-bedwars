@@ -145,12 +145,12 @@ Every single feature from the Survey phase is mapped to a designated Milestone:
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Voxel Engine, Textures & Mechanics | Features 1–7: Rendering bug fixes, 16x16 pixel-art ore & crack textures, hold-to-mine hardness loop, DDA raycasting, audio & particles | none | DONE |
-| M2 | Bedwars UI, Ranking & Frontpage Portal | Features 8–14: In-game HUD/scoreboard, hearts, hotbar, upgrades integration, bloxd.io rank rating (2-team ranked), leveling, OAuth portal | M1 | DONE |
-| M3 | Multi-Map System, Formats & Mutations | Features 15–26: 3 balanced maps (Colosseum, Speedway, Octagon), dynamic teams, projectile system, 9 game mutations | M1, M2 | IN_PROGRESS |
-| M4 | Dual-Layer Networking & Dedicated Server | Features 27–31: Dedicated WebSocket server in `server/`, `/ping` monitoring, WebRTC fallback, full state sync, LAN discovery & direct join | M1, M2, M3 | PLANNED |
-| M5 | Cross-Platform Packaging & Netlify | Features 32–35: Netlify SPA deploy, Electron desktop packaging, Capacitor mobile packaging, responsive touch controls | M1, M2, M4 | PLANNED |
-| M6 | Final Verification & Adversarial Hardening | Features 36–37: Pass 100% of E2E test suite (Tiers 1-4) and Tier 5 adversarial coverage hardening | M1, M2, M3, M4, M5 | PLANNED |
+| M1 | Minecraft Asset Pipeline & Ingestion | Ingest 443 authentic Minecraft textures & 251 sounds into public/assets/minecraft/ from scratch_minecraft_ref | none | DONE |
+| M2 | External Voxel Engine Integration | 16x16x16 greedy chunk meshing, nearest-neighbor texture atlas with UV tiling shader, AABB physics & 0.5 step-climbing, bloxd.io targeted face outline, crack stages 0-9 | M1 | DONE |
+| M3 | Authentic Hypixel Bedwars HUD & bloxd.io UI | 10 armor chestplates, 10 health hearts (+ golden absorption), 10 hunger drumsticks, green XP bar with level numeral, 9-slot hotbar with [B] quick shop, crosshair with 4-tick hitmarker, scoreboard with countdowns | M2 | DONE |
+| M4 | 3D Held Item in Viewport & Floating Spawner Holograms | HeldItemRenderer camera viewport anchoring, walking bobbing, attack swing curve, GLSL purple enchantment glint shader, floating billboard spawner holograms, 3D rotating/bobbing drops | M2, M3 | DONE |
+| M5 | Bedwars Systems, Shop & Multiplayer Integration | Authentic dark-slate categorized shopkeeper GUI (Recommended, Blocks, Combat, Utility), map preservation (Speedway, Colosseum, Octagon), dual-layer WebSocket/WebRTC, LAN support | M1, M2, M3, M4 | IN_PROGRESS |
+| M6 | Automated E2E Verification & Tier 5 Hardening | Full 288 master tests pass + all milestone suites, white-box adversarial coverage hardening, zero regressions, clean Vite production build | M1, M2, M3, M4, M5 | PLANNED |
 
 ---
 

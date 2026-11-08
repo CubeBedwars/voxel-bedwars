@@ -222,13 +222,13 @@ export const MAP_PRESETS = {
     teams: ['red', 'blue', 'green', 'yellow', 'aqua', 'white', 'pink', 'gray'],
     spawns: {
       red: { x: 50, y: 22, z: 0 },
-      blue: { x: 35, y: 22, z: 35 },
+      blue: { x: 50 * Math.SQRT1_2, y: 22, z: 50 * Math.SQRT1_2 },
       green: { x: 0, y: 22, z: 50 },
-      yellow: { x: -35, y: 22, z: 35 },
+      yellow: { x: -50 * Math.SQRT1_2, y: 22, z: 50 * Math.SQRT1_2 },
       aqua: { x: -50, y: 22, z: 0 },
-      white: { x: -35, y: 22, z: -35 },
+      white: { x: -50 * Math.SQRT1_2, y: 22, z: -50 * Math.SQRT1_2 },
       pink: { x: 0, y: 22, z: -50 },
-      gray: { x: 35, y: 22, z: -35 },
+      gray: { x: 50 * Math.SQRT1_2, y: 22, z: -50 * Math.SQRT1_2 },
     },
     beds: {
       red: { head: { x: 55, y: 21, z: 0 }, foot: { x: 54, y: 21, z: 0 } },

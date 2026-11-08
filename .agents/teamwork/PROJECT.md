@@ -139,18 +139,33 @@ Every single feature from the Survey phase is mapped to a designated Milestone:
 | 35 | Responsive Mobile Touch Controls | On-screen virtual joystick, camera look drag zone, floating action buttons, touch hotbar | M5 | Survey R5 |
 | 36 | 100% E2E Test Suite Pass (Tiers 1-4) | Pass all opaque-box requirement tests published by E2E Testing Track (`TEST_READY.md`) | M6 | Survey Final |
 | 37 | Tier 5 Adversarial Coverage Hardening | White-box stress testing, edge-case generation, and bug patching with Challenger loop | M6 | Survey Final |
+| 38 | Minecraft Asset Extraction & Pipeline | Extract 443 textures & 251 authentic Minecraft sounds from `scratch_minecraft_ref` into `public/assets/minecraft/` via `scripts/ingest_minecraft_assets.js` | M1 | Overhaul Survey |
+| 39 | Texture Atlas & Crack Overlay Assets | Generate 16x16 block atlas and 10 mining crack stages (0-9) extracted from scratch ref | M1 | Overhaul Survey |
+| 40 | Audio Registry & Soundbanks | Load and register 251 authentic Minecraft sounds (dig, step, hurt, pop, explode, UI) | M1 | Overhaul Survey |
+| 41 | 16x16x16 Greedy Chunk Meshing | Greedy face quad merging with full face culling and UV tiling shader for 70-85% triangle reduction | M2 | Overhaul Survey |
+| 42 | Nearest-Neighbor Texture Atlas Engine | Pixel-art texture atlas binding with `THREE.NearestFilter` and seamless multi-block tiling | M2 | Overhaul Survey |
+| 43 | Bloxd.io Targeted Face Quad Outline | Replace wireframe cube with white targeted face quad outline for clear bridging | M2 | Overhaul Survey |
+| 44 | AABB Voxel Physics & Step-Climbing | True 0.6x1.8x0.6 AABB physics with 0.5-block step-climbing, gravity, and launchpad impulse | M2 | Overhaul Survey |
+| 45 | Hypixel Bedwars HUD Vitals | 10 armor chestplates, 10 health hearts (with half-hearts & absorption), 10 hunger drumsticks, green XP bar | M3 | Overhaul Survey |
+| 46 | Hotbar, Quick Shop & Hitmarker Crosshair | 9-slot hotbar with selection highlight, stack counters, `[B]` quick shop shortcut, and 4-tick hitmarker crosshair | M3 | Overhaul Survey |
+| 47 | Scoreboard Event Timers & Bed Statuses | Scoreboard tracking map name, active mutation, event countdowns (Diamond II, Emerald II), and bed statuses | M3 | Overhaul Survey |
+| 48 | 3D Held Item with Enchantment Glint | 3D extruded voxel held item with walking bobbing, attack swing, and purple scrolling GLSL enchantment glint | M4 | Overhaul Survey |
+| 49 | 3D Floating Spawner Holograms | Billboard canvas titles ("Iron/Gold Forge", countdown timers) and bobbing 3D voxel item drops | M4 | Overhaul Survey |
+| 50 | Categorized Dark-Slate Shop GUI | Minecraft dark-slate shopkeeper modal with Recommended, Blocks, Combat, Utility tabs & upgrades | M5 | Overhaul Survey |
+| 51 | Systems & Multiplayer Preservation | Retain Speedway/Colosseum/Octagon maps, mutations, bloxd.io ranking, WebSocket/WebRTC, Netlify build | M5 | Overhaul Survey |
+| 52 | E2E Regression & Tier 5 Hardening | Automated verification suite across all assets, engine, HUD, and Bedwars logic | M6 | Overhaul Survey |
 
 ---
 
-## Milestones
+## Milestones (Minecraft-Fidelity & External Engine Overhaul)
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Voxel Engine, Textures & Mechanics | Features 1–7: Rendering bug fixes, 16x16 pixel-art ore & crack textures, hold-to-mine hardness loop, DDA raycasting, audio & particles | none | DONE |
-| M2 | Bedwars UI, Ranking & Frontpage Portal | Features 8–14: In-game HUD/scoreboard, hearts, hotbar, upgrades integration, bloxd.io rank rating (2-team ranked), leveling, OAuth portal | M1 | DONE |
-| M3 | Multi-Map System, Formats & Mutations | Features 15–26: 3 balanced maps (Colosseum, Speedway, Octagon), dynamic teams, projectile system, 9 game mutations | M1, M2 | DONE |
-| M4 | Dual-Layer Networking & Dedicated Server | Features 27–31: Dedicated WebSocket server in `server/`, `/ping` monitoring, WebRTC fallback, full state sync, LAN discovery & direct join | M1, M2, M3 | DONE |
-| M5 | Cross-Platform Packaging & Netlify | Features 32–35: Netlify SPA deploy, Electron desktop packaging, Capacitor mobile packaging, responsive touch controls | M1, M2, M4 | DONE |
-| M6 | Final Verification & Adversarial Hardening | Features 36–37: Pass 100% of E2E test suite (Tiers 1-4) and Tier 5 adversarial coverage hardening | M1, M2, M3, M4, M5 | DONE |
+| M1 | Minecraft Asset Pipeline & Ingestion | Features 38–40: Extract 443 textures (blocks, items, GUI, cracks 0-9) & 251 sounds, generate asset manifest and loader | none | DONE |
+| M2 | External Voxel Engine Integration | Features 41–44: 16x16x16 greedy chunk meshing, nearest-neighbor texture atlas, targeted face outline, AABB physics & step-climbing | M1 | DONE |
+| M3 | Hypixel Bedwars HUD & bloxd.io In-Game UI | Features 45–47: 10 armor chestplates, 10 hearts + absorption, 10 hunger drumsticks, green XP bar, 9-slot hotbar with [B] shortcut, hitmarker, scoreboard | M1 | DONE |
+| M4 | 3D Held Item & Floating Spawner Holograms | Features 48–49: `HeldItemRenderer.js` with 3D items, swing animation, purple enchantment glint shader, floating billboard holograms | M1, M2 | IN_PROGRESS |
+| M5 | Bedwars Systems, Shop & Multiplayer Integration | Features 50–51: Dark-slate categorized shopkeeper GUI, map preservation (Speedway, Colosseum, Octagon), dual-layer networking, Netlify deploy | M1, M2, M3, M4 | PLANNED |
+| M6 | Automated E2E Verification & Tier 5 Hardening | Feature 52: Pass 100% test suite, adversarial coverage hardening, forensic audit | M1, M2, M3, M4, M5 | PLANNED |
 
 ---
 

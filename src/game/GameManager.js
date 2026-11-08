@@ -17,6 +17,7 @@ import { AuthManager } from '../auth/AuthManager.js';
 import { Projectile } from '../entities/Projectile.js';
 import { MutationManager } from './MutationManager.js';
 import { TouchControls } from '../ui/TouchControls.js';
+import { MinecraftAssetLoader } from '../engine/MinecraftAssetLoader.js';
 
 export class GameManager {
   constructor() {
@@ -31,6 +32,7 @@ export class GameManager {
     this.rankManager = new RankManager();
     this.levelManager = new LevelManager();
     this.authManager = new AuthManager();
+    this.assetLoader = new MinecraftAssetLoader();
 
     // 1. Scene & Camera Setup
     this.scene = new THREE.Scene();
@@ -40,11 +42,22 @@ export class GameManager {
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 400);
     this.scene.add(this.camera); // Add camera to scene graph so armGroup / weapons render
 
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    try {
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    } catch {
+      // Headless Node.js test environment mock renderer
+      this.renderer = {
+        setSize: () => {},
+        setPixelRatio: () => {},
+        render: () => {},
+        shadowMap: { enabled: false },
+        domElement: this.canvas
+      };
+    }
 
     // 2. Lighting Setup
     this.initLighting();
@@ -76,14 +89,21 @@ export class GameManager {
     this.crackMesh.visible = false;
     this.scene.add(this.crackMesh);
 
-    const selectGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
+    // Bloxd.io-style targeted face quad outline
+    const selectGeo = new THREE.BufferGeometry();
+    const selectPositions = new Float32Array(4 * 3);
+    selectGeo.setAttribute('position', new THREE.BufferAttribute(selectPositions, 3));
     const selectMat = new THREE.LineBasicMaterial({
-      color: 0x000000,
+      color: 0xffffff,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.9,
       linewidth: 2,
+      depthTest: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     });
-    this.selectionMesh = new THREE.LineSegments(selectGeo, selectMat);
+    this.selectionMesh = new THREE.LineLoop(selectGeo, selectMat);
     this.selectionMesh.visible = false;
     this.scene.add(this.selectionMesh);
 
@@ -187,8 +207,45 @@ export class GameManager {
       } else if (e.code === 'KeyU') {
         if (document.pointerLockElement) document.exitPointerLock();
         this.hud.upgradesModal.classList.remove('hidden');
+      } else if (e.code === 'KeyB') {
+        this.toggleQuickShop();
+      } else if (e.code === 'Escape' || e.key === 'Escape') {
+        if (this.hud?.shopModal && !this.hud.shopModal.classList.contains('hidden')) {
+          this.hud.closeShop();
+        } else if (this.hud?.upgradesModal && !this.hud.upgradesModal.classList.contains('hidden')) {
+          this.hud.upgradesModal.classList.add('hidden');
+          this.canvas?.requestPointerLock?.();
+        }
       }
     });
+  }
+
+  /**
+   * Checks whether the player is currently within their team base island area.
+   * @param {Object} [player=this.localPlayer]
+   * @returns {boolean}
+   */
+  isPlayerAtBase(player = this.localPlayer) {
+    if (!player) return true;
+    const teamSpawn = this.mapPreset?.spawns?.[player.team];
+    if (!teamSpawn) return true;
+    const dist = Math.hypot(player.position.x - teamSpawn.x, player.position.z - teamSpawn.z);
+    return dist <= 24;
+  }
+
+  /**
+   * Toggles the Quick Shop modal if the player is at their base island.
+   */
+  toggleQuickShop() {
+    if (this.hud?.shopModal && !this.hud.shopModal.classList.contains('hidden')) {
+      this.hud.closeShop();
+      return;
+    }
+    if (this.isPlayerAtBase()) {
+      this.hud?.openShop();
+    } else {
+      this.hud?.showAnnouncement('QUICK SHOP', 'You must be at your base island to open Quick Shop!');
+    }
   }
 
   handleLeftClick() {
@@ -218,6 +275,9 @@ export class GameManager {
         bot.takeDamage(attackDamage, this.localPlayer, this.physics, this.teamManager);
         if (this.sound) this.sound.playHit();
         this.particles.spawnHitSparks(bot.position);
+        if (this.hud && typeof this.hud.triggerHitmarker === 'function') {
+          this.hud.triggerHitmarker();
+        }
         if (this.network && this.network.activeTransport !== 'none') {
           this.network.broadcastPlayerDamage(bot.id, attackDamage);
         }
@@ -385,13 +445,43 @@ export class GameManager {
   }
 
   updateMining(dt) {
-    // 1. Block selection outline targeting
+    // 1. Block selection outline targeting (Bloxd.io-style white targeted face quad outline)
     const hit = this.getAimRaycast();
-    if (hit.hit && hit.type !== BLOCK_TYPES.AIR && !this.localPlayer.isDead) {
-      this.selectionMesh.position.set(hit.blockPos.x + 0.5, hit.blockPos.y + 0.5, hit.blockPos.z + 0.5);
-      this.selectionMesh.visible = true;
+    if (hit.hit && hit.type !== BLOCK_TYPES.AIR && !this.localPlayer.isDead && hit.normal) {
+      const { x, y, z } = hit.blockPos;
+      const norm = hit.normal;
+      const eps = 0.002; // Small offset along face normal to eliminate z-fighting
+
+      let p0, p1, p2, p3;
+      if (norm.y > 0.5) { // Top Face (+Y)
+        const ny = y + 1 + eps;
+        p0 = [x, ny, z]; p1 = [x + 1, ny, z]; p2 = [x + 1, ny, z + 1]; p3 = [x, ny, z + 1];
+      } else if (norm.y < -0.5) { // Bottom Face (-Y)
+        const ny = y - eps;
+        p0 = [x, ny, z]; p1 = [x + 1, ny, z]; p2 = [x + 1, ny, z + 1]; p3 = [x, ny, z + 1];
+      } else if (norm.x > 0.5) { // East Face (+X)
+        const nx = x + 1 + eps;
+        p0 = [nx, y, z]; p1 = [nx, y, z + 1]; p2 = [nx, y + 1, z + 1]; p3 = [nx, y + 1, z];
+      } else if (norm.x < -0.5) { // West Face (-X)
+        const nx = x - eps;
+        p0 = [nx, y, z]; p1 = [nx, y, z + 1]; p2 = [nx, y + 1, z + 1]; p3 = [nx, y + 1, z];
+      } else if (norm.z > 0.5) { // South Face (+Z)
+        const nz = z + 1 + eps;
+        p0 = [x, y, nz]; p1 = [x + 1, y, nz]; p2 = [x + 1, y + 1, nz]; p3 = [x, y + 1, nz];
+      } else { // North Face (-Z)
+        const nz = z - eps;
+        p0 = [x, y, nz]; p1 = [x + 1, y, nz]; p2 = [x + 1, y + 1, nz]; p3 = [x, y + 1, nz];
+      }
+
+      if (this.selectionMesh && this.selectionMesh.geometry && this.selectionMesh.geometry.attributes.position) {
+        const posAttr = this.selectionMesh.geometry.attributes.position;
+        posAttr.array.set([...p0, ...p1, ...p2, ...p3]);
+        posAttr.needsUpdate = true;
+        this.selectionMesh.position.set(0, 0, 0);
+        this.selectionMesh.visible = true;
+      }
     } else {
-      this.selectionMesh.visible = false;
+      if (this.selectionMesh) this.selectionMesh.visible = false;
     }
 
     if (this.localPlayer.isDead) {
@@ -687,8 +777,21 @@ export class GameManager {
       this.mapPreset = MAP_PRESETS.speedway;
     }
 
+    // Determine active teams and player counts based on format
+    const fmt = String(format || mode || 'solo').toLowerCase();
+    const isTwoTeamFormat = fmt === '1v1' || fmt === 'duel_1v1' || fmt === '4v4';
+
+    let activeTeams = [...this.mapPreset.teams];
+    if (isTwoTeamFormat) {
+      activeTeams = ['red', 'blue'];
+    } else if (fmt === '1v1v1v1' || fmt === '2v2v2v2' || fmt === '3v3v3v3' || fmt === 'solo' || fmt === 'duos' || fmt === 'trios') {
+      if (this.mapPreset.teams.length > 4 && fmt !== 'solo_8' && fmt !== 'duos_8' && fmt !== 'octagon') {
+        activeTeams = ['red', 'blue', 'green', 'yellow'];
+      }
+    }
+
     // 2. Initialize teams dynamically from map preset
-    this.teamManager.initTeams(this.mapPreset.teams);
+    this.teamManager.initTeams(activeTeams);
     this.teamManager.gameManager = this;
 
     // 3. Clear active projectiles
@@ -706,6 +809,18 @@ export class GameManager {
       this.mutationManager.enable('Speed Demon');
     } else if (mode === 'lucky') {
       this.mutationManager.enable('Lucky Chaos');
+    }
+
+    // Determine players per team
+    let playersPerTeam = 1;
+    if (fmt === '4v4') {
+      playersPerTeam = 4;
+    } else if (fmt === '3v3v3v3' || fmt === 'trios') {
+      playersPerTeam = 3;
+    } else if (fmt === '2v2v2v2' || fmt === 'duos' || fmt === 'duos_8') {
+      playersPerTeam = 2;
+    } else {
+      playersPerTeam = 1;
     }
 
     // Reset local player stats for new match
@@ -728,7 +843,7 @@ export class GameManager {
       this.teamManager.teams.red.players = [this.localPlayer];
     }
 
-    // Spawn AI Bots for opponent teams
+    // Spawn AI Bots
     // Remove previous bots
     for (let i = this.players.length - 1; i >= 1; i--) {
       this.players[i].destroy();
@@ -736,15 +851,34 @@ export class GameManager {
     }
 
     if (withBots) {
-      const opponentTeams = this.mapPreset.teams.filter(t => t !== this.localPlayer.team);
+      // 1. Spawn allied bots on player's team ('red')
+      for (let i = 1; i < playersPerTeam; i++) {
+        const alliedBot = new BotPlayer(`bot_red_${i}`, `Bot RED ${i + 1}`, 'red', this.scene);
+        alliedBot.teamManager = this.teamManager;
+        alliedBot.respawn(redSpawn);
+        this.players.push(alliedBot);
+        if (this.teamManager.teams.red) {
+          this.teamManager.teams.red.players.push(alliedBot);
+        }
+      }
+
+      // 2. Spawn opponent bots on other active teams
+      const opponentTeams = activeTeams.filter(t => t !== this.localPlayer.team);
       opponentTeams.forEach(team => {
-        const bot = new BotPlayer(`bot_${team}`, `Bot ${team.toUpperCase()}`, team, this.scene);
-        bot.teamManager = this.teamManager;
-        const spawn = this.mapPreset.spawns[team] || { x: 0, y: 22, z: 0 };
-        bot.respawn(spawn);
-        this.players.push(bot);
         if (this.teamManager.teams[team]) {
-          this.teamManager.teams[team].players = [bot];
+          this.teamManager.teams[team].players = [];
+        }
+        for (let i = 1; i <= playersPerTeam; i++) {
+          const botId = playersPerTeam === 1 ? `bot_${team}` : `bot_${team}_${i}`;
+          const botName = playersPerTeam === 1 ? `Bot ${team.toUpperCase()}` : `Bot ${team.toUpperCase()} ${i}`;
+          const bot = new BotPlayer(botId, botName, team, this.scene);
+          bot.teamManager = this.teamManager;
+          const spawn = this.mapPreset.spawns[team] || { x: 0, y: 22, z: 0 };
+          bot.respawn(spawn);
+          this.players.push(bot);
+          if (this.teamManager.teams[team]) {
+            this.teamManager.teams[team].players.push(bot);
+          }
         }
       });
     }

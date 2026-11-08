@@ -96,9 +96,13 @@ export class LanDiscovery {
    */
   sendBeacon(beacon) {
     // 1. Desktop Electron Native Bridge (if present)
-    if (typeof window !== 'undefined' && window.electronAPI?.broadcastLanBeacon) {
+    if (typeof window !== 'undefined' && window.electronAPI) {
       try {
-        window.electronAPI.broadcastLanBeacon(beacon);
+        if (typeof window.electronAPI.broadcastLanBeacon === 'function') {
+          window.electronAPI.broadcastLanBeacon(beacon);
+        } else if (typeof window.electronAPI.broadcastLAN === 'function') {
+          window.electronAPI.broadcastLAN(beacon, beacon.port || this.port);
+        }
       } catch (e) {}
     }
 
@@ -128,10 +132,16 @@ export class LanDiscovery {
     if (onUpdate) this.listeners.add(onUpdate);
 
     // Desktop Electron Native Bridge listener
-    if (typeof window !== 'undefined' && window.electronAPI?.onLanBeaconReceived) {
-      window.electronAPI.onLanBeaconReceived((beacon) => {
-        this.handleBeacon(beacon);
-      });
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      if (typeof window.electronAPI.onLanBeaconReceived === 'function') {
+        window.electronAPI.onLanBeaconReceived((beacon) => {
+          this.handleBeacon(beacon);
+        });
+      } else if (typeof window.electronAPI.onLANMessage === 'function') {
+        window.electronAPI.onLANMessage((data) => {
+          this.handleBeacon(data?.payload || data);
+        });
+      }
     }
 
     // Periodic room pruning for rooms not seen in 8 seconds

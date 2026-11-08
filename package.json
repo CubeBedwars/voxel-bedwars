@@ -13,6 +13,8 @@
     "desktop:build": "vite build && electron-builder --project desktop",
     "mobile:sync": "cap sync",
     "mobile:build": "vite build && cap copy",
+    "ingest:assets": "node scripts/ingest_minecraft_assets.js",
+    "test:assets": "node tests/test_minecraft_assets.js",
     "test:m4": "node tests/stress_m4_networking.js",
     "test:m5": "node tests/stress_m5_cross_platform.js",
     "test": "node tests/e2e-runner.js"
